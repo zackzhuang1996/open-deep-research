@@ -3,6 +3,9 @@
 
 An Open-Source clone of Open AI's Deep Research experiment. Instead of using a fine=tuned version of o3, this method uses [Firecrawl's extract + search](https://firecrawl.dev/) with a reasoning model to deep research the web.
 
+
+![Open Deep Research Hero](public/images/hero.png)
+
 ## Features
 
 - [Firecrawl](https://firecrawl.dev) Search + Extract
