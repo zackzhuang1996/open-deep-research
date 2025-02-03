@@ -766,7 +766,7 @@ export async function POST(request: Request) {
                     }),
                     prompt: `You are a research agent analyzing findings about: ${topic}
                             Current findings: ${findings.join('\n')}
-                            What has been learned? What gaps remain? What specific aspects should be investigated next?`
+                            What has been learned? What gaps remain? What specific aspects should be investigated next? Should I continue or do I need to stop as I have enough information?`
                   });
                   return result.object.analysis;
                 } catch (error) {
