@@ -2,10 +2,10 @@
 
 import type {
   Attachment,
-  ChatRequestOptions,
   CreateMessage,
   Message,
 } from 'ai';
+import type { ChatRequestOptions } from '@/lib/types';
 import cx from 'classnames';
 import type React from 'react';
 import {
@@ -29,6 +29,8 @@ import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
+import { useDeepResearch } from '@/lib/deep-research-context';
+import { DeepResearch } from './deep-research';
 
 function PureMultimodalInput({
   chatId,
@@ -67,6 +69,7 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
+  const { state: deepResearchState, toggleActive: toggleDeepResearch } = useDeepResearch();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -122,6 +125,7 @@ function PureMultimodalInput({
 
     handleSubmit(undefined, {
       experimental_attachments: attachments,
+      experimental_deepResearch: deepResearchState.isActive,
     });
 
     setAttachments([]);
@@ -138,6 +142,7 @@ function PureMultimodalInput({
     setLocalStorageInput,
     width,
     chatId,
+    deepResearchState.isActive,
   ]);
 
   const uploadFile = async (file: File) => {
@@ -230,29 +235,39 @@ function PureMultimodalInput({
         </div>
       )}
 
-      <Textarea
-        ref={textareaRef}
-        placeholder="Send a message..."
-        value={input}
-        onChange={handleInput}
-        className={cx(
-          'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700',
-          className,
-        )}
-        rows={2}
-        autoFocus
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault();
+      <div className="flex flex-col gap-2">
+        <DeepResearch
+          isActive={deepResearchState.isActive}
+          onToggle={toggleDeepResearch}
+          isLoading={isLoading}
+          activity={deepResearchState.activity}
+          sources={deepResearchState.sources}
+        />
 
-            if (isLoading) {
-              toast.error('Please wait for the model to finish its response!');
-            } else {
-              submitForm();
+        <Textarea
+          ref={textareaRef}
+          placeholder="Send a message..."
+          value={input}
+          onChange={handleInput}
+          className={cx(
+            'min-h-[24px] max-h-[calc(75dvh)] overflow-hidden resize-none rounded-2xl !text-base bg-muted pb-10 dark:border-zinc-700',
+            className,
+          )}
+          rows={2}
+          autoFocus
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+
+              if (isLoading) {
+                toast.error('Please wait for the model to finish its response!');
+              } else {
+                submitForm();
+              }
             }
-          }
-        }}
-      />
+          }}
+        />
+      </div>
 
       <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
         <AttachmentsButton fileInputRef={fileInputRef} isLoading={isLoading} />

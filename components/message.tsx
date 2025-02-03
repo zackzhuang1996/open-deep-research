@@ -3,7 +3,7 @@
 import type { ChatRequestOptions, Message } from 'ai';
 import cx from 'classnames';
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, useEffect } from 'react';
 
 import type { Vote } from '@/lib/db/schema';
 
@@ -22,6 +22,7 @@ import { DocumentPreview } from './document-preview';
 import { SearchResults } from './search-results';
 import { ExtractResults } from './extract-results';
 import { ScrapeResults } from './scrape-results';
+import { useDeepResearch } from '@/lib/deep-research-context';
 
 const PurePreviewMessage = ({
   chatId,
@@ -45,6 +46,25 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const { addActivity, addSource } = useDeepResearch();
+
+  useEffect(() => {
+    if (message.toolInvocations) {
+      message.toolInvocations.forEach((toolInvocation) => {
+        if (toolInvocation.toolName === 'deepResearch' && toolInvocation.state === 'result') {
+          const { result } = toolInvocation;
+          if (result.success) {
+            result.data.activity.forEach((activity: any) => {
+              addActivity(activity);
+            });
+            result.data.sources.forEach((source: any) => {
+              addSource(source);
+            });
+          }
+        }
+      });
+    }
+  }, [message.toolInvocations, addActivity, addSource]);
 
   return (
     <AnimatePresence>
@@ -188,6 +208,10 @@ const PurePreviewMessage = ({
                             data={result.data}
                             isLoading={false}
                           />
+                        ) : toolName === 'deepResearch' ? (
+                          <div className="text-sm text-muted-foreground">
+                            {result.success ? 'Research completed successfully.' : `Research failed: ${result.error}`}
+                          </div>
                         ) : (
                           <pre>{JSON.stringify(result, null, 2)}</pre>
                         )}

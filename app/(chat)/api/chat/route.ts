@@ -43,7 +43,8 @@ type AllowedTools =
   | 'requestSuggestions'
   | 'search'
   | 'extract'
-  | 'scrape';
+  | 'scrape'
+  | 'deepResearch';
 
 const blocksTools: AllowedTools[] = [
   'createDocument',
@@ -53,7 +54,7 @@ const blocksTools: AllowedTools[] = [
 
 const firecrawlTools: AllowedTools[] = ['search', 'extract', 'scrape'];
 
-const allTools: AllowedTools[] = [...firecrawlTools];
+const allTools: AllowedTools[] = [...firecrawlTools, 'deepResearch'];
 
 const app = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_API_KEY || '',
@@ -689,6 +690,183 @@ export async function POST(request: Request) {
                 return {
                   error: `Extraction failed: ${error.message}`,
                   success: false,
+                };
+              }
+            },
+          },
+          deepResearch: {
+            description: 'Perform deep research on a topic using a combination of search, extract, and analysis tools.',
+            parameters: z.object({
+              topic: z.string().describe('The topic or question to research'),
+              maxDepth: z.number().optional().describe('Maximum depth of research iterations'),
+            }),
+            execute: async ({ topic, maxDepth = 3 }) => {
+              const researchState = {
+                activity: [] as Array<{
+                  type: 'search' | 'extract' | 'analyze';
+                  status: 'pending' | 'complete' | 'error';
+                  message: string;
+                  timestamp: string;
+                }>,
+                sources: [] as Array<{
+                  url: string;
+                  title: string;
+                  relevance: number;
+                }>,
+                findings: [] as Array<string>,
+              };
+
+              const addActivity = (activity: typeof researchState.activity[0]) => {
+                researchState.activity.push(activity);
+                dataStream.writeData({
+                  type: 'research-activity',
+                  content: activity,
+                });
+              };
+
+              const addSource = (source: typeof researchState.sources[0]) => {
+                if (!researchState.sources.find(s => s.url === source.url)) {
+                  researchState.sources.push(source);
+                  dataStream.writeData({
+                    type: 'research-source',
+                    content: source,
+                  });
+                }
+              };
+
+              try {
+                // Initial search
+                addActivity({
+                  type: 'search',
+                  status: 'pending',
+                  message: `Searching for information about "${topic}"`,
+                  timestamp: new Date().toISOString(),
+                });
+
+                const searchResult = await app.search(topic);
+                
+                if (!searchResult.success) {
+                  throw new Error(`Search failed: ${searchResult.error}`);
+                }
+
+                addActivity({
+                  type: 'search',
+                  status: 'complete',
+                  message: `Found ${searchResult.data.length} relevant results`,
+                  timestamp: new Date().toISOString(),
+                });
+
+                // Add sources from search
+                searchResult.data.forEach((result: any) => {
+                  addSource({
+                    url: result.url,
+                    title: result.title,
+                    relevance: result.score || 0.5,
+                  });
+                });
+
+                // Extract information from top sources one by one to avoid overloading
+                const topUrls = searchResult.data
+                  .slice(0, 3)
+                  .map((result: any) => result.url);
+
+                const findings: string[] = [];
+
+                for (const url of topUrls) {
+                  addActivity({
+                    type: 'extract',
+                    status: 'pending',
+                    message: `Extracting information from ${new URL(url).hostname}`,
+                    timestamp: new Date().toISOString(),
+                  });
+
+                  try {
+                    const extractResult = await app.extract([url], {
+                      prompt: `Extract key information about ${topic}. Focus on factual data, statistics, and expert opinions.`,
+                    });
+
+                    if (extractResult.success) {
+                      addActivity({
+                        type: 'extract',
+                        status: 'complete',
+                        message: `Successfully extracted information from ${new URL(url).hostname}`,
+                        timestamp: new Date().toISOString(),
+                      });
+
+                      if (Array.isArray(extractResult.data)) {
+                        findings.push(...extractResult.data.map((item: any) => item.data));
+                      } else {
+                        findings.push(extractResult.data);
+                      }
+                    } else {
+                      addActivity({
+                        type: 'extract',
+                        status: 'error',
+                        message: `Failed to extract from ${new URL(url).hostname}: ${extractResult.error}`,
+                        timestamp: new Date().toISOString(),
+                      });
+                    }
+                  } catch (error: any) {
+                    console.error('Extraction error for URL:', url, error);
+                    addActivity({
+                      type: 'extract',
+                      status: 'error',
+                      message: `Failed to extract from ${new URL(url).hostname}: ${error.message}`,
+                      timestamp: new Date().toISOString(),
+                    });
+                  }
+
+                  // Add a small delay between extractions
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                // Only proceed with analysis if we have findings
+                if (findings.length > 0) {
+                  addActivity({
+                    type: 'analyze',
+                    status: 'pending',
+                    message: 'Analyzing and synthesizing findings',
+                    timestamp: new Date().toISOString(),
+                  });
+
+                  researchState.findings = findings;
+
+                  addActivity({
+                    type: 'analyze',
+                    status: 'complete',
+                    message: `Analysis complete - Found information from ${findings.length} sources`,
+                    timestamp: new Date().toISOString(),
+                  });
+
+                  return {
+                    success: true,
+                    data: {
+                      activity: researchState.activity,
+                      sources: researchState.sources,
+                      findings: researchState.findings,
+                    },
+                  };
+                } else {
+                  throw new Error('No information could be extracted from the sources');
+                }
+
+              } catch (error: any) {
+                console.error('Deep research error:', error);
+                addActivity({
+                  type: 'analyze',
+                  status: 'error',
+                  message: `Research failed: ${error.message}`,
+                  timestamp: new Date().toISOString(),
+                });
+
+                return {
+                  success: false,
+                  error: error.message,
+                  data: {
+                    activity: researchState.activity,
+                    sources: researchState.sources,
+                    findings: researchState.findings,
+                  },
                 };
               }
             },

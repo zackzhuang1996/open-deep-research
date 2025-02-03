@@ -2,7 +2,8 @@
 
 import { motion } from 'framer-motion';
 import { Button } from './ui/button';
-import { ChatRequestOptions, CreateMessage, Message } from 'ai';
+import type { CreateMessage, Message } from 'ai';
+import type { ChatRequestOptions } from '@/lib/types';
 import { memo } from 'react';
 
 interface SuggestedActionsProps {
