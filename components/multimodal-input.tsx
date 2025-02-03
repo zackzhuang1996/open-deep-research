@@ -236,7 +236,6 @@ function PureMultimodalInput({
       )}
 
       <div className="flex flex-col gap-2">
-        {isLoading && (
           <DeepResearch
             isActive={true}
             onToggle={() => {}}
@@ -244,7 +243,6 @@ function PureMultimodalInput({
             activity={deepResearchState.activity}
             sources={deepResearchState.sources}
           />
-        )}
 
         <Textarea
           ref={textareaRef}
@@ -382,7 +380,7 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
 function PureDeepResearchButton() {
   return (
     <Button
-      className="rounded-full px-3 py-1.5 h-fit flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 disabled:opacity-100 disabled:cursor-not-allowed"
+      className="rounded-full px-3 py-1.5 h-fit flex items-center gap-2 bg-orange-50 hover:bg-orange-100 text-orange-600 border-0 disabled:opacity-100 disabled:cursor-not-allowed"
       variant="ghost"
       disabled
     >

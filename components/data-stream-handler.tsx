@@ -24,7 +24,7 @@ type DataStreamDelta = {
     | 'activity-delta'
     | 'source-delta';
   content: string | Suggestion | {
-    type: 'search' | 'extract' | 'analyze';
+    type: 'search' | 'extract' | 'analyze' | 'reasoning' | 'synthesis' | 'thought';
     status: 'pending' | 'complete' | 'error';
     message: string;
     timestamp: string;
@@ -129,7 +129,7 @@ export function DataStreamHandler({ id }: { id: string }) {
 
           case 'activity-delta':
             const activity = delta.content as {
-              type: 'search' | 'extract' | 'analyze';
+              type: 'search' | 'extract' | 'analyze' | 'thought' | 'reasoning';
               status: 'pending' | 'complete' | 'error';
               message: string;
               timestamp: string;

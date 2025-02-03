@@ -23,6 +23,7 @@ import { SearchResults } from './search-results';
 import { ExtractResults } from './extract-results';
 import { ScrapeResults } from './scrape-results';
 import { useDeepResearch } from '@/lib/deep-research-context';
+import { Progress } from './ui/progress';
 
 const PurePreviewMessage = ({
   chatId,
@@ -46,25 +47,29 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
-  const { addActivity, addSource } = useDeepResearch();
+  // const { addActivity, addSource } = useDeepResearch();
 
-  useEffect(() => {
-    if (message.toolInvocations) {
-      message.toolInvocations.forEach((toolInvocation) => {
-        if (toolInvocation.toolName === 'deepResearch' && toolInvocation.state === 'result') {
-          const { result } = toolInvocation;
-          if (result.success) {
-            result.data.activity.forEach((activity: any) => {
-              addActivity(activity);
-            });
-            result.data.sources.forEach((source: any) => {
-              addSource(source);
-            });
-          }
-        }
-      });
-    }
-  }, [message.toolInvocations, addActivity, addSource]);
+  // useEffect(() => {
+  //   if (message.toolInvocations) {
+  //     message.toolInvocations.forEach((toolInvocation) => {
+  //       try {
+  //       if (toolInvocation.toolName === 'deepResearch' && toolInvocation.state === 'result') {
+  //         const { result } = toolInvocation;
+  //         if (result.success) {
+  //           result.data.activity.forEach((activity: any) => {
+  //             addActivity(activity);
+  //           });
+  //           result.data.sources.forEach((source: any) => {
+  //             addSource(source);
+  //           });
+  //         }
+  //       }
+  //     } catch (error) {
+          
+  //     }
+  //     });
+  //   }
+  // }, [message.toolInvocations, addActivity, addSource]);
 
   return (
     <AnimatePresence>
@@ -210,7 +215,7 @@ const PurePreviewMessage = ({
                           />
                         ) : toolName === 'deepResearch' ? (
                           <div className="text-sm text-muted-foreground">
-                            {result.success ? 'Research completed successfully.' : `Research failed: ${result.error}`}
+                            {result.success ? 'Research completed successfully.' : `Research may have failed: ${result.error}`}
                           </div>
                         ) : (
                           <pre>{JSON.stringify(result, null, 2)}</pre>
@@ -248,6 +253,26 @@ const PurePreviewMessage = ({
                           url={args.url}
                           data=""
                           isLoading={true}
+                        />
+                      ) : toolName === 'deepResearch' ? (
+                        <DeepResearchProgress 
+                          state={state}
+                          activity={
+                            (toolInvocation as { 
+                              state: string; 
+                              delta?: { 
+                                activity?: Array<{
+                                  type: string;
+                                  status: string;
+                                  message: string;
+                                  timestamp: string;
+                                  depth?: number;
+                                }> 
+                              } 
+                            }).state === 'streaming' && 
+                            (toolInvocation as any).delta?.activity ? 
+                            [...((toolInvocation as any).delta.activity || [])] : []
+                          } 
                         />
                       ) : null}
                     </div>
@@ -319,5 +344,83 @@ export const ThinkingMessage = () => {
         </div>
       </div>
     </motion.div>
+  );
+};
+
+const DeepResearchProgress = ({ state, activity }: { 
+  state: string; 
+  activity: Array<{
+    type: string;
+    status: string;
+    message: string;
+    timestamp: string;
+    depth?: number;
+  }> 
+}) => {
+  const { state: deepResearchState } = useDeepResearch();
+  const [lastActivity, setLastActivity] = useState<string>('');
+  
+  useEffect(() => {
+    if (activity && activity.length > 0) {
+      setLastActivity(activity[activity.length - 1].message);
+    }
+  }, [activity]);
+
+  // Calculate steps per depth
+  const stepsPerDepth = useMemo(() => {
+    // Each depth typically involves: search, multiple extracts, analysis
+    return 5; // 1 search + 3 extracts + 1 analysis
+  }, []);
+
+  // Calculate total expected steps
+  const totalExpectedSteps = useMemo(() => {
+    return deepResearchState.maxDepth * stepsPerDepth;
+  }, [deepResearchState.maxDepth, stepsPerDepth]);
+
+  // Calculate completed steps
+  const completedSteps = useMemo(() => {
+    return activity.filter(a => a.status === 'complete').length;
+  }, [activity]);
+
+  // Calculate overall progress
+  const progress = useMemo(() => {
+    if (totalExpectedSteps === 0) return 0;
+    return Math.min((completedSteps / totalExpectedSteps) * 100, 100);
+  }, [completedSteps, totalExpectedSteps]);
+
+  // Get current phase
+  const currentPhase = useMemo(() => {
+    if (!activity.length) return '';
+    const current = activity[activity.length - 1];
+    switch (current.type) {
+      case 'search': return 'Searching';
+      case 'extract': return 'Extracting';
+      case 'analyze': return 'Analyzing';
+      case 'synthesis': return 'Synthesizing';
+      default: return 'Researching';
+    }
+  }, [activity]);
+
+  return (
+    <div className="w-full space-y-2">
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col gap-1">
+          <span>{currentPhase}...</span>
+          <span className="text-xs">
+            Depth: {deepResearchState.currentDepth}/{deepResearchState.maxDepth}
+          </span>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span>{Math.round(progress)}%</span>
+          <span className="text-xs">
+            Step {completedSteps}/{totalExpectedSteps}
+          </span>
+        </div>
+      </div>
+      <Progress value={progress} className="w-full" />
+      <div className="text-xs text-muted-foreground">
+        {lastActivity}
+      </div>
+    </div>
   );
 };

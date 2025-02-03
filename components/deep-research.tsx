@@ -7,7 +7,7 @@ interface DeepResearchProps {
   onToggle: () => void;
   isLoading?: boolean;
   activity?: Array<{
-    type: 'search' | 'extract' | 'analyze';
+    type: 'search' | 'extract' | 'analyze' | 'reasoning' | 'synthesis' | 'thought';
     status: 'pending' | 'complete' | 'error';
     message: string;
     timestamp: string;
@@ -24,21 +24,21 @@ export function DeepResearch({
   activity = [],
   sources = [],
 }: DeepResearchProps) {
-  if (!isLoading || (activity.length === 0 && sources.length === 0)) {
+  if ((activity.length === 0 && sources.length === 0)) {
     return null;
   }
 
   return (
-    <div className="fixed right-4 top-20 w-80 bg-background border rounded-lg shadow-lg p-4">
-      <Tabs defaultValue="activity">
+    <div className="fixed right-4 top-20 w-80 bg-background border rounded-lg shadow-lg p-4 max-h-[80vh] flex flex-col overflow-hidden">
+      <Tabs defaultValue="activity" className="flex flex-col flex-1">
         <TabsList className="w-full">
           <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
           <TabsTrigger value="sources" className="flex-1">Sources</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="activity" className="mt-4">
+        <TabsContent value="activity" className="mt-4 overflow-y-auto flex-1 pr-2">
           <div className="space-y-4">
-            {activity.map((item, index) => (
+            {[...activity].reverse().map((item, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 10 }}
@@ -46,13 +46,13 @@ export function DeepResearch({
                 className="flex items-start gap-3"
               >
                 <div className={cn(
-                  "mt-1 size-2 rounded-full",
+                  "mt-1 size-2 rounded-full shrink-0",
                   item.status === 'pending' && "bg-yellow-500",
                   item.status === 'complete' && "bg-green-500",
                   item.status === 'error' && "bg-red-500"
                 )} />
-                <div className="flex-1">
-                  <p className="text-sm text-foreground">{item.message}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground break-words">{item.message}</p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(item.timestamp).toLocaleTimeString()}
                   </p>
@@ -62,7 +62,7 @@ export function DeepResearch({
           </div>
         </TabsContent>
         
-        <TabsContent value="sources" className="mt-4">
+        <TabsContent value="sources" className="mt-4 overflow-y-auto flex-1 pr-2">
           <div className="space-y-4">
             {sources.map((source, index) => (
               <motion.div
@@ -75,17 +75,17 @@ export function DeepResearch({
                   href={source.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-medium hover:underline"
+                  className="text-sm font-medium hover:underline break-words"
                 >
                   {source.title}
                 </a>
                 <div className="flex items-center gap-2">
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-muted-foreground truncate">
                     {new URL(source.url).hostname}
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  {/* <div className="text-xs text-muted-foreground">
                     Relevance: {Math.round(source.relevance * 100)}%
-                  </div>
+                  </div> */}
                 </div>
               </motion.div>
             ))}
@@ -94,4 +94,4 @@ export function DeepResearch({
       </Tabs>
     </div>
   );
-} 
+}
