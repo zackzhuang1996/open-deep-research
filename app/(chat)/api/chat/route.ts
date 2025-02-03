@@ -6,18 +6,18 @@ import {
   generateText,
   streamObject,
   streamText,
-} from 'ai';
-import { z } from 'zod';
+} from "ai";
+import { z } from "zod";
 
-import { auth, signIn } from '@/app/(auth)/auth';
-import { customModel } from '@/lib/ai';
-import { models } from '@/lib/ai/models';
-import { rateLimiter } from '@/lib/rate-limit';
+import { auth, signIn } from "@/app/(auth)/auth";
+import { customModel } from "@/lib/ai";
+import { models } from "@/lib/ai/models";
+import { rateLimiter } from "@/lib/rate-limit";
 import {
   codePrompt,
   systemPrompt,
   updateDocumentPrompt,
-} from '@/lib/ai/prompts';
+} from "@/lib/ai/prompts";
 import {
   deleteChatById,
   getChatById,
@@ -26,40 +26,38 @@ import {
   saveDocument,
   saveMessages,
   saveSuggestions,
-} from '@/lib/db/queries';
-import type { Suggestion } from '@/lib/db/schema';
+} from "@/lib/db/queries";
+import type { Suggestion } from "@/lib/db/schema";
 import {
   generateUUID,
   getMostRecentUserMessage,
   sanitizeResponseMessages,
-} from '@/lib/utils';
+} from "@/lib/utils";
 
-import { generateTitleFromUserMessage } from '../../actions';
-import FirecrawlApp from '@mendable/firecrawl-js';
-import { openai } from '@ai-sdk/openai';
+import { generateTitleFromUserMessage } from "../../actions";
+import FirecrawlApp from "@mendable/firecrawl-js";
+import { openai } from "@ai-sdk/openai";
 
 export const maxDuration = 300;
 
 type AllowedTools =
-  | 'requestSuggestions'
-  | 'deepResearch'
-  | 'search'
-  | 'extract'
-  | 'scrape';
+  | "requestSuggestions"
+  | "deepResearch"
+  | "search"
+  | "extract"
+  | "scrape";
 
-const blocksTools: AllowedTools[] = [
-  'requestSuggestions',
-];
+const blocksTools: AllowedTools[] = ["requestSuggestions"];
 
-const firecrawlTools: AllowedTools[] = ['search', 'extract', 'scrape'];
+const firecrawlTools: AllowedTools[] = ["search", "extract", "scrape"];
 
-const allTools: AllowedTools[] = [...firecrawlTools, 'deepResearch'];
+const allTools: AllowedTools[] = [...firecrawlTools, "deepResearch"];
 
 const app = new FirecrawlApp({
-  apiKey: process.env.FIRECRAWL_API_KEY || '',
+  apiKey: process.env.FIRECRAWL_API_KEY || "",
 });
 
-const reasoningModel = openai('o1-mini');
+const reasoningModel = openai("o1-mini");
 
 export async function POST(request: Request) {
   const {
@@ -74,13 +72,13 @@ export async function POST(request: Request) {
   // If no session exists, create an anonymous session
   if (!session?.user) {
     try {
-      const result = await signIn('credentials', {
+      const result = await signIn("credentials", {
         redirect: false,
       });
 
       if (result?.error) {
-        console.error('Failed to create anonymous session:', result.error);
-        return new Response('Failed to create anonymous session', {
+        console.error("Failed to create anonymous session:", result.error);
+        return new Response("Failed to create anonymous session", {
           status: 500,
         });
       }
@@ -88,25 +86,26 @@ export async function POST(request: Request) {
       session = await auth();
 
       if (!session?.user) {
-        console.error('Failed to get session after creation');
-        return new Response('Failed to create session', { status: 500 });
+        console.error("Failed to get session after creation");
+        return new Response("Failed to create session", { status: 500 });
       }
     } catch (error) {
-      console.error('Error creating anonymous session:', error);
-      return new Response('Failed to create anonymous session', {
+      console.error("Error creating anonymous session:", error);
+      return new Response("Failed to create anonymous session", {
         status: 500,
       });
     }
   }
 
   if (!session?.user?.id) {
-    return new Response('Failed to create session', { status: 500 });
+    return new Response("Failed to create session", { status: 500 });
   }
 
   // Apply rate limiting
   const identifier = session.user.id;
-  const { success, limit, reset, remaining } =
-    await rateLimiter.limit(identifier);
+  const { success, limit, reset, remaining } = await rateLimiter.limit(
+    identifier
+  );
 
   if (!success) {
     return new Response(`Too many requests`, { status: 429 });
@@ -115,14 +114,14 @@ export async function POST(request: Request) {
   const model = models.find((model) => model.id === modelId);
 
   if (!model) {
-    return new Response('Model not found', { status: 404 });
+    return new Response("Model not found", { status: 404 });
   }
 
   const coreMessages = convertToCoreMessages(messages);
   const userMessage = getMostRecentUserMessage(coreMessages);
 
   if (!userMessage) {
-    return new Response('No user message found', { status: 400 });
+    return new Response("No user message found", { status: 400 });
   }
 
   const chat = await getChatById({ id });
@@ -143,7 +142,7 @@ export async function POST(request: Request) {
   return createDataStreamResponse({
     execute: (dataStream) => {
       dataStream.writeData({
-        type: 'user-message-id',
+        type: "user-message-id",
         content: userMessageId,
       });
 
@@ -156,59 +155,59 @@ export async function POST(request: Request) {
         tools: {
           createDocument: {
             description:
-              'Create a document for a writing activity. This tool will call other functions that will generate the contents of the document based on the title and kind.',
+              "Create a document for a writing activity. This tool will call other functions that will generate the contents of the document based on the title and kind.",
             parameters: z.object({
               title: z.string(),
-              kind: z.enum(['text', 'code', 'spreadsheet']),
+              kind: z.enum(["text", "code", "spreadsheet"]),
             }),
             execute: async ({ title, kind }) => {
               const id = generateUUID();
-              let draftText = '';
+              let draftText = "";
 
               dataStream.writeData({
-                type: 'id',
+                type: "id",
                 content: id,
               });
 
               dataStream.writeData({
-                type: 'title',
+                type: "title",
                 content: title,
               });
 
               dataStream.writeData({
-                type: 'kind',
+                type: "kind",
                 content: kind,
               });
 
               dataStream.writeData({
-                type: 'clear',
-                content: '',
+                type: "clear",
+                content: "",
               });
 
-              if (kind === 'text') {
+              if (kind === "text") {
                 const { fullStream } = streamText({
                   model: customModel(model.apiIdentifier),
                   system:
-                    'Write about the given topic. Markdown is supported. Use headings wherever appropriate.',
+                    "Write about the given topic. Markdown is supported. Use headings wherever appropriate.",
                   prompt: title,
                 });
 
                 for await (const delta of fullStream) {
                   const { type } = delta;
 
-                  if (type === 'text-delta') {
+                  if (type === "text-delta") {
                     const { textDelta } = delta;
 
                     draftText += textDelta;
                     dataStream.writeData({
-                      type: 'text-delta',
+                      type: "text-delta",
                       content: textDelta,
                     });
                   }
                 }
 
-                dataStream.writeData({ type: 'finish', content: '' });
-              } else if (kind === 'code') {
+                dataStream.writeData({ type: "finish", content: "" });
+              } else if (kind === "code") {
                 const { fullStream } = streamObject({
                   model: customModel(model.apiIdentifier),
                   system: codePrompt,
@@ -221,14 +220,14 @@ export async function POST(request: Request) {
                 for await (const delta of fullStream) {
                   const { type } = delta;
 
-                  if (type === 'object') {
+                  if (type === "object") {
                     const { object } = delta;
                     const { code } = object;
 
                     if (code) {
                       dataStream.writeData({
-                        type: 'code-delta',
-                        content: code ?? '',
+                        type: "code-delta",
+                        content: code ?? "",
                       });
 
                       draftText = code;
@@ -236,8 +235,8 @@ export async function POST(request: Request) {
                   }
                 }
 
-                dataStream.writeData({ type: 'finish', content: '' });
-              } else if (kind === 'spreadsheet') {
+                dataStream.writeData({ type: "finish", content: "" });
+              } else if (kind === "spreadsheet") {
                 const { fullStream } = streamObject({
                   model: customModel(model.apiIdentifier),
                   system: `You are a spreadsheet initialization assistant. Create a spreadsheet structure based on the title/description and the chat history.
@@ -246,13 +245,13 @@ export async function POST(request: Request) {
                     - If the title doesn't suggest specific columns, create a general-purpose structure`,
                   prompt:
                     title +
-                    '\n\nChat History:\n' +
-                    coreMessages.map((msg) => msg.content).join('\n'),
+                    "\n\nChat History:\n" +
+                    coreMessages.map((msg) => msg.content).join("\n"),
                   schema: z.object({
                     headers: z
                       .array(z.string())
-                      .describe('Column headers for the spreadsheet'),
-                    rows: z.array(z.array(z.string())).describe('Data rows'),
+                      .describe("Column headers for the spreadsheet"),
+                    rows: z.array(z.array(z.string())).describe("Data rows"),
                   }),
                 });
 
@@ -264,7 +263,7 @@ export async function POST(request: Request) {
                 for await (const delta of fullStream) {
                   const { type } = delta;
 
-                  if (type === 'object') {
+                  if (type === "object") {
                     const { object } = delta;
                     if (
                       object &&
@@ -273,16 +272,16 @@ export async function POST(request: Request) {
                     ) {
                       // Validate and normalize the data
                       const headers = object.headers.map((h) =>
-                        String(h || ''),
+                        String(h || "")
                       );
                       const rows = object.rows.map((row) => {
                         // Handle undefined row by creating empty array
                         const safeRow = (row || []).map((cell) =>
-                          String(cell || ''),
+                          String(cell || "")
                         );
                         // Ensure row length matches headers
                         while (safeRow.length < headers.length)
-                          safeRow.push('');
+                          safeRow.push("");
                         return safeRow.slice(0, headers.length);
                       });
 
@@ -293,11 +292,11 @@ export async function POST(request: Request) {
 
                 draftText = JSON.stringify(spreadsheetData);
                 dataStream.writeData({
-                  type: 'spreadsheet-delta',
+                  type: "spreadsheet-delta",
                   content: draftText,
                 });
 
-                dataStream.writeData({ type: 'finish', content: '' });
+                dataStream.writeData({ type: "finish", content: "" });
               }
 
               if (session.user?.id) {
@@ -315,44 +314,44 @@ export async function POST(request: Request) {
                 title,
                 kind,
                 content:
-                  'A document was created and is now visible to the user.',
+                  "A document was created and is now visible to the user.",
               };
             },
           },
           updateDocument: {
-            description: 'Update a document with the given description.',
+            description: "Update a document with the given description.",
             parameters: z.object({
-              id: z.string().describe('The ID of the document to update'),
+              id: z.string().describe("The ID of the document to update"),
               description: z
                 .string()
-                .describe('The description of changes that need to be made'),
+                .describe("The description of changes that need to be made"),
             }),
             execute: async ({ id, description }) => {
               const document = await getDocumentById({ id });
 
               if (!document) {
                 return {
-                  error: 'Document not found',
+                  error: "Document not found",
                 };
               }
 
               const { content: currentContent } = document;
-              let draftText = '';
+              let draftText = "";
 
               dataStream.writeData({
-                type: 'clear',
+                type: "clear",
                 content: document.title,
               });
 
-              if (document.kind === 'text') {
+              if (document.kind === "text") {
                 const { fullStream } = streamText({
                   model: customModel(model.apiIdentifier),
-                  system: updateDocumentPrompt(currentContent, 'text'),
+                  system: updateDocumentPrompt(currentContent, "text"),
                   prompt: description,
                   experimental_providerMetadata: {
                     openai: {
                       prediction: {
-                        type: 'content',
+                        type: "content",
                         content: currentContent,
                       },
                     },
@@ -362,22 +361,22 @@ export async function POST(request: Request) {
                 for await (const delta of fullStream) {
                   const { type } = delta;
 
-                  if (type === 'text-delta') {
+                  if (type === "text-delta") {
                     const { textDelta } = delta;
 
                     draftText += textDelta;
                     dataStream.writeData({
-                      type: 'text-delta',
+                      type: "text-delta",
                       content: textDelta,
                     });
                   }
                 }
 
-                dataStream.writeData({ type: 'finish', content: '' });
-              } else if (document.kind === 'code') {
+                dataStream.writeData({ type: "finish", content: "" });
+              } else if (document.kind === "code") {
                 const { fullStream } = streamObject({
                   model: customModel(model.apiIdentifier),
-                  system: updateDocumentPrompt(currentContent, 'code'),
+                  system: updateDocumentPrompt(currentContent, "code"),
                   prompt: description,
                   schema: z.object({
                     code: z.string(),
@@ -387,14 +386,14 @@ export async function POST(request: Request) {
                 for await (const delta of fullStream) {
                   const { type } = delta;
 
-                  if (type === 'object') {
+                  if (type === "object") {
                     const { object } = delta;
                     const { code } = object;
 
                     if (code) {
                       dataStream.writeData({
-                        type: 'code-delta',
-                        content: code ?? '',
+                        type: "code-delta",
+                        content: code ?? "",
                       });
 
                       draftText = code;
@@ -402,8 +401,8 @@ export async function POST(request: Request) {
                   }
                 }
 
-                dataStream.writeData({ type: 'finish', content: '' });
-              } else if (document.kind === 'spreadsheet') {
+                dataStream.writeData({ type: "finish", content: "" });
+              } else if (document.kind === "spreadsheet") {
                 // Parse the current content as spreadsheet data
                 let currentSpreadsheetData = { headers: [], rows: [] };
                 try {
@@ -431,24 +430,24 @@ export async function POST(request: Request) {
                     {"headers":["Name","Email","Phone"],"rows":[["John","john@example.com","123-456-7890"],["Jane","jane@example.com","098-765-4321"]]}`,
                   prompt: `${description}\n\nChat History:\n${coreMessages
                     .map((msg) => msg.content)
-                    .join('\n')}`,
+                    .join("\n")}`,
                   schema: z.object({
                     headers: z
                       .array(z.string())
-                      .describe('Column headers for the spreadsheet'),
+                      .describe("Column headers for the spreadsheet"),
                     rows: z
                       .array(z.array(z.string()))
-                      .describe('Sample data rows'),
+                      .describe("Sample data rows"),
                   }),
                 });
 
-                let updatedContent = '';
+                let updatedContent = "";
                 draftText = JSON.stringify(currentSpreadsheetData);
 
                 for await (const delta of fullStream) {
                   const { type } = delta;
 
-                  if (type === 'object') {
+                  if (type === "object") {
                     const { object } = delta;
                     if (
                       object &&
@@ -457,32 +456,32 @@ export async function POST(request: Request) {
                     ) {
                       // Validate and normalize the data
                       const headers = object.headers.map((h: any) =>
-                        String(h || ''),
+                        String(h || "")
                       );
                       const rows = object.rows.map(
                         (row: (string | undefined)[] | undefined) => {
                           const normalizedRow = (row || []).map((cell: any) =>
-                            String(cell || ''),
+                            String(cell || "")
                           );
                           // Ensure row length matches new headers length
                           while (normalizedRow.length < headers.length) {
-                            normalizedRow.push('');
+                            normalizedRow.push("");
                           }
                           return normalizedRow.slice(0, headers.length);
-                        },
+                        }
                       );
 
                       const newData = { headers, rows };
                       draftText = JSON.stringify(newData);
                       dataStream.writeData({
-                        type: 'spreadsheet-delta',
+                        type: "spreadsheet-delta",
                         content: draftText,
                       });
                     }
                   }
                 }
 
-                dataStream.writeData({ type: 'finish', content: '' });
+                dataStream.writeData({ type: "finish", content: "" });
               }
 
               if (session.user?.id) {
@@ -499,46 +498,46 @@ export async function POST(request: Request) {
                 id,
                 title: document.title,
                 kind: document.kind,
-                content: 'The document has been updated successfully.',
+                content: "The document has been updated successfully.",
               };
             },
           },
           requestSuggestions: {
-            description: 'Request suggestions for a document',
+            description: "Request suggestions for a document",
             parameters: z.object({
               documentId: z
                 .string()
-                .describe('The ID of the document to request edits'),
+                .describe("The ID of the document to request edits"),
             }),
             execute: async ({ documentId }) => {
               const document = await getDocumentById({ id: documentId });
 
               if (!document || !document.content) {
                 return {
-                  error: 'Document not found',
+                  error: "Document not found",
                 };
               }
 
               const suggestions: Array<
-                Omit<Suggestion, 'userId' | 'createdAt' | 'documentCreatedAt'>
+                Omit<Suggestion, "userId" | "createdAt" | "documentCreatedAt">
               > = [];
 
               const { elementStream } = streamObject({
                 model: customModel(model.apiIdentifier),
                 system:
-                  'You are a help writing assistant. Given a piece of writing, please offer suggestions to improve the piece of writing and describe the change. It is very important for the edits to contain full sentences instead of just words. Max 5 suggestions.',
+                  "You are a help writing assistant. Given a piece of writing, please offer suggestions to improve the piece of writing and describe the change. It is very important for the edits to contain full sentences instead of just words. Max 5 suggestions.",
                 prompt: document.content,
-                output: 'array',
+                output: "array",
                 schema: z.object({
                   originalSentence: z
                     .string()
-                    .describe('The original sentence'),
+                    .describe("The original sentence"),
                   suggestedSentence: z
                     .string()
-                    .describe('The suggested sentence'),
+                    .describe("The suggested sentence"),
                   description: z
                     .string()
-                    .describe('The description of the suggestion'),
+                    .describe("The description of the suggestion"),
                 }),
               });
 
@@ -553,7 +552,7 @@ export async function POST(request: Request) {
                 };
 
                 dataStream.writeData({
-                  type: 'suggestion',
+                  type: "suggestion",
                   content: suggestion,
                 });
 
@@ -577,7 +576,7 @@ export async function POST(request: Request) {
                 id: documentId,
                 title: document.title,
                 kind: document.kind,
-                message: 'Suggestions have been added to the document',
+                message: "Suggestions have been added to the document",
               };
             },
           },
@@ -587,11 +586,11 @@ export async function POST(request: Request) {
             parameters: z.object({
               query: z
                 .string()
-                .describe('Search query to find relevant web pages'),
+                .describe("Search query to find relevant web pages"),
               maxResults: z
                 .number()
                 .optional()
-                .describe('Maximum number of results to return (default 10)'),
+                .describe("Maximum number of results to return (default 10)"),
             }),
             execute: async ({ query, maxResults = 5 }) => {
               try {
@@ -618,15 +617,15 @@ export async function POST(request: Request) {
           },
           extract: {
             description:
-              'Extract structured data from web pages. Use this to get wahtever data you need from a URL. Any time someone needs to gather data from something, use this tool.',
+              "Extract structured data from web pages. Use this to get wahtever data you need from a URL. Any time someone needs to gather data from something, use this tool.",
             parameters: z.object({
               urls: z.array(z.string()).describe(
-                'Array of URLs to extract data from',
+                "Array of URLs to extract data from"
                 // , include a /* at the end of each URL if you think you need to search for other pages insides that URL to extract the full data from',
               ),
               prompt: z
                 .string()
-                .describe('Description of what data to extract'),
+                .describe("Description of what data to extract"),
             }),
             execute: async ({ urls, prompt }) => {
               try {
@@ -649,7 +648,7 @@ export async function POST(request: Request) {
                   success: true,
                 };
               } catch (error: any) {
-                console.error('Extraction error:', error);
+                console.error("Extraction error:", error);
                 console.error(error.message);
                 console.error(error.error);
                 return {
@@ -661,9 +660,9 @@ export async function POST(request: Request) {
           },
           scrape: {
             description:
-              'Scrape web pages. Use this to get from a page when you have the url.',
+              "Scrape web pages. Use this to get from a page when you have the url.",
             parameters: z.object({
-              url: z.string().describe('URL to scrape'),
+              url: z.string().describe("URL to scrape"),
             }),
             execute: async ({ url }: { url: string }) => {
               try {
@@ -681,11 +680,11 @@ export async function POST(request: Request) {
                 return {
                   data:
                     scrapeResult.markdown ??
-                    'Could get the page content, try using search or extract',
+                    "Could get the page content, try using search or extract",
                   success: true,
                 };
               } catch (error: any) {
-                console.error('Extraction error:', error);
+                console.error("Extraction error:", error);
                 console.error(error.message);
                 console.error(error.error);
                 return {
@@ -696,30 +695,31 @@ export async function POST(request: Request) {
             },
           },
           deepResearch: {
-            description: 'Perform deep research on a topic using an AI agent that coordinates search, extract, and analysis tools with reasoning steps.',
+            description:
+              "Perform deep research on a topic using an AI agent that coordinates search, extract, and analysis tools with reasoning steps.",
             parameters: z.object({
-              topic: z.string().describe('The topic or question to research'),
+              topic: z.string().describe("The topic or question to research"),
             }),
             execute: async ({ topic, maxDepth = 7 }) => {
               const startTime = Date.now();
               const timeLimit = 4.5 * 60 * 1000; // 4 minutes 30 seconds in milliseconds
 
               const researchState = {
-                findings: [] as Array<{text: string, source: string}>,
+                findings: [] as Array<{ text: string; source: string }>,
                 currentDepth: 0,
                 failedAttempts: 0,
                 maxFailedAttempts: 3,
                 completedSteps: 0,
-                totalExpectedSteps: maxDepth * 5
+                totalExpectedSteps: maxDepth * 5,
               };
 
               // Initialize progress tracking
               dataStream.writeData({
-                type: 'progress-init',
+                type: "progress-init",
                 content: {
                   maxDepth,
-                  totalSteps: researchState.totalExpectedSteps
-                }
+                  totalSteps: researchState.totalExpectedSteps,
+                },
               });
 
               const addSource = (source: {
@@ -728,38 +728,47 @@ export async function POST(request: Request) {
                 description: string;
               }) => {
                 dataStream.writeData({
-                  type: 'source-delta',
-                  content: source
+                  type: "source-delta",
+                  content: source,
                 });
               };
 
               const addActivity = (activity: {
-                type: 'search' | 'extract' | 'analyze' | 'reasoning' | 'synthesis' | 'thought';
-                status: 'pending' | 'complete' | 'error';
+                type:
+                  | "search"
+                  | "extract"
+                  | "analyze"
+                  | "reasoning"
+                  | "synthesis"
+                  | "thought";
+                status: "pending" | "complete" | "error";
                 message: string;
                 timestamp: string;
                 depth: number;
               }) => {
-                if (activity.status === 'complete') {
+                if (activity.status === "complete") {
                   researchState.completedSteps++;
                 }
-                
+
                 dataStream.writeData({
-                  type: 'activity-delta',
+                  type: "activity-delta",
                   content: {
                     ...activity,
                     depth: researchState.currentDepth,
                     completedSteps: researchState.completedSteps,
-                    totalSteps: researchState.totalExpectedSteps
-                  }
+                    totalSteps: researchState.totalExpectedSteps,
+                  },
                 });
               };
 
-              const analyzeAndPlan = async (findings: Array<{text: string, source: string}>) => {
+              const analyzeAndPlan = async (
+                findings: Array<{ text: string; source: string }>
+              ) => {
                 try {
                   const timeElapsed = Date.now() - startTime;
                   const timeRemaining = timeLimit - timeElapsed;
-                  const timeRemainingMinutes = Math.round(timeRemaining / 1000 / 60 * 10) / 10;
+                  const timeRemainingMinutes =
+                    Math.round((timeRemaining / 1000 / 60) * 10) / 10;
 
                   const result = await generateObject({
                     model: reasoningModel,
@@ -768,19 +777,21 @@ export async function POST(request: Request) {
                         summary: z.string(),
                         gaps: z.array(z.string()),
                         nextSteps: z.array(z.string()),
-                        shouldContinue: z.boolean()
-                      })
+                        shouldContinue: z.boolean(),
+                      }),
                     }),
                     prompt: `You are a research agent analyzing findings about: ${topic}
                             You have ${timeRemainingMinutes} minutes remaining to complete the research but you don't need to use all of it.
-                            Current findings: ${findings.map(f => `[From ${f.source}]: ${f.text}`).join('\n')}
+                            Current findings: ${findings
+                              .map((f) => `[From ${f.source}]: ${f.text}`)
+                              .join("\n")}
                             What has been learned? What gaps remain? What specific aspects should be investigated next if any?
                             Important: If less than 1 minute remains, set shouldContinue to false to allow time for final synthesis.
-                            If I have enough information, set shouldContinue to false.`
+                            If I have enough information, set shouldContinue to false.`,
                   });
                   return result.object.analysis;
                 } catch (error) {
-                  console.error('Analysis error:', error);
+                  console.error("Analysis error:", error);
                   return null;
                 }
               };
@@ -789,11 +800,11 @@ export async function POST(request: Request) {
                 const extractPromises = urls.map(async (url) => {
                   try {
                     addActivity({
-                      type: 'extract', 
-                      status: 'pending',
+                      type: "extract",
+                      status: "pending",
                       message: `Analyzing ${new URL(url).hostname}`,
                       timestamp: new Date().toISOString(),
-                      depth: researchState.currentDepth
+                      depth: researchState.currentDepth,
                     });
 
                     const result = await app.extract([url], {
@@ -802,20 +813,20 @@ export async function POST(request: Request) {
 
                     if (result.success) {
                       addActivity({
-                        type: 'extract',
-                        status: 'complete', 
+                        type: "extract",
+                        status: "complete",
                         message: `Extracted from ${new URL(url).hostname}`,
                         timestamp: new Date().toISOString(),
-                        depth: researchState.currentDepth
+                        depth: researchState.currentDepth,
                       });
 
                       if (Array.isArray(result.data)) {
-                        return result.data.map(item => ({
+                        return result.data.map((item) => ({
                           text: item.data,
-                          source: url
+                          source: url,
                         }));
                       }
-                      return [{text: result.data, source: url}];
+                      return [{ text: result.data, source: url }];
                     }
                     return [];
                   } catch (error) {
@@ -836,50 +847,53 @@ export async function POST(request: Request) {
                   }
 
                   researchState.currentDepth++;
-                  
+
                   dataStream.writeData({
-                    type: 'depth-delta',
-                    content: { 
-                      current: researchState.currentDepth, 
+                    type: "depth-delta",
+                    content: {
+                      current: researchState.currentDepth,
                       max: maxDepth,
                       completedSteps: researchState.completedSteps,
-                      totalSteps: researchState.totalExpectedSteps
-                    }
+                      totalSteps: researchState.totalExpectedSteps,
+                    },
                   });
 
                   // Search phase
                   addActivity({
-                    type: 'search',
-                    status: 'pending',
+                    type: "search",
+                    status: "pending",
                     message: `Searching for "${topic}"`,
                     timestamp: new Date().toISOString(),
-                    depth: researchState.currentDepth
+                    depth: researchState.currentDepth,
                   });
 
                   const searchResult = await app.search(topic);
-                  
+
                   if (!searchResult.success) {
                     addActivity({
-                      type: 'search',
-                      status: 'error',
+                      type: "search",
+                      status: "error",
                       message: `Search failed for "${topic}"`,
                       timestamp: new Date().toISOString(),
-                      depth: researchState.currentDepth
+                      depth: researchState.currentDepth,
                     });
-                    
+
                     researchState.failedAttempts++;
-                    if (researchState.failedAttempts >= researchState.maxFailedAttempts) {
+                    if (
+                      researchState.failedAttempts >=
+                      researchState.maxFailedAttempts
+                    ) {
                       break;
                     }
                     continue;
                   }
 
                   addActivity({
-                    type: 'search',
-                    status: 'complete',
+                    type: "search",
+                    status: "complete",
                     message: `Found ${searchResult.data.length} relevant results`,
                     timestamp: new Date().toISOString(),
-                    depth: researchState.currentDepth
+                    depth: researchState.currentDepth,
                   });
 
                   // Add sources from search results
@@ -887,10 +901,10 @@ export async function POST(request: Request) {
                     addSource({
                       url: result.url,
                       title: result.title,
-                      description: result.description
+                      description: result.description,
                     });
                   });
-                  
+
                   // Extract phase
                   const topUrls = searchResult.data
                     .slice(0, 3)
@@ -901,37 +915,40 @@ export async function POST(request: Request) {
 
                   // Analysis phase
                   addActivity({
-                    type: 'analyze',
-                    status: 'pending',
-                    message: 'Analyzing findings',
+                    type: "analyze",
+                    status: "pending",
+                    message: "Analyzing findings",
                     timestamp: new Date().toISOString(),
-                    depth: researchState.currentDepth
+                    depth: researchState.currentDepth,
                   });
 
                   const analysis = await analyzeAndPlan(researchState.findings);
                   console.log(analysis);
                   if (!analysis) {
                     addActivity({
-                      type: 'analyze',
-                      status: 'error',
-                      message: 'Failed to analyze findings',
+                      type: "analyze",
+                      status: "error",
+                      message: "Failed to analyze findings",
                       timestamp: new Date().toISOString(),
-                      depth: researchState.currentDepth
+                      depth: researchState.currentDepth,
                     });
-                    
+
                     researchState.failedAttempts++;
-                    if (researchState.failedAttempts >= researchState.maxFailedAttempts) {
+                    if (
+                      researchState.failedAttempts >=
+                      researchState.maxFailedAttempts
+                    ) {
                       break;
                     }
                     continue;
                   }
 
                   addActivity({
-                    type: 'analyze',
-                    status: 'complete',
+                    type: "analyze",
+                    status: "complete",
                     message: analysis.summary,
                     timestamp: new Date().toISOString(),
-                    depth: researchState.currentDepth
+                    depth: researchState.currentDepth,
                   });
 
                   if (!analysis.shouldContinue || analysis.gaps.length === 0) {
@@ -943,32 +960,34 @@ export async function POST(request: Request) {
 
                 // Final synthesis
                 addActivity({
-                  type: 'synthesis',
-                  status: 'pending',
-                  message: 'Preparing final analysis',
+                  type: "synthesis",
+                  status: "pending",
+                  message: "Preparing final analysis",
                   timestamp: new Date().toISOString(),
-                  depth: researchState.currentDepth
+                  depth: researchState.currentDepth,
                 });
 
                 const finalAnalysis = await generateText({
                   model: reasoningModel,
                   maxTokens: 16000,
                   prompt: `Create a comprehensive analysis of ${topic} based on these findings:
-                          ${researchState.findings.map(f => `[From ${f.source}]: ${f.text}`).join('\n')}
-                          Provide key insights, conclusions, and any remaining uncertainties. Include citations to sources where appropriate. This analysiss should be very comprehensive and full of details.`
+                          ${researchState.findings
+                            .map((f) => `[From ${f.source}]: ${f.text}`)
+                            .join("\n")}
+                          Provide key insights, conclusions, and any remaining uncertainties. Include citations to sources where appropriate. This analysiss should be very comprehensive and full of details.`,
                 });
 
                 addActivity({
-                  type: 'synthesis',
-                  status: 'complete',
-                  message: 'Research completed',
+                  type: "synthesis",
+                  status: "complete",
+                  message: "Research completed",
                   timestamp: new Date().toISOString(),
-                  depth: researchState.currentDepth
+                  depth: researchState.currentDepth,
                 });
 
                 dataStream.writeData({
-                  type: 'finish',
-                  content: finalAnalysis.text
+                  type: "finish",
+                  content: finalAnalysis.text,
                 });
 
                 return {
@@ -977,19 +996,18 @@ export async function POST(request: Request) {
                     findings: researchState.findings,
                     analysis: finalAnalysis.text,
                     completedSteps: researchState.completedSteps,
-                    totalSteps: researchState.totalExpectedSteps
-                  }
+                    totalSteps: researchState.totalExpectedSteps,
+                  },
                 };
-
               } catch (error: any) {
-                console.error('Deep research error:', error);
-                
+                console.error("Deep research error:", error);
+
                 addActivity({
-                  type: 'thought',
-                  status: 'error', 
+                  type: "thought",
+                  status: "error",
                   message: `Research failed: ${error.message}`,
                   timestamp: new Date().toISOString(),
-                  depth: researchState.currentDepth
+                  depth: researchState.currentDepth,
                 });
 
                 return {
@@ -998,8 +1016,8 @@ export async function POST(request: Request) {
                   data: {
                     findings: researchState.findings,
                     completedSteps: researchState.completedSteps,
-                    totalSteps: researchState.totalExpectedSteps
-                  }
+                    totalSteps: researchState.totalExpectedSteps,
+                  },
                 };
               }
             },
@@ -1016,7 +1034,7 @@ export async function POST(request: Request) {
                   (message) => {
                     const messageId = generateUUID();
 
-                    if (message.role === 'assistant') {
+                    if (message.role === "assistant") {
                       dataStream.writeMessageAnnotation({
                         messageIdFromServer: messageId,
                       });
@@ -1029,17 +1047,17 @@ export async function POST(request: Request) {
                       content: message.content,
                       createdAt: new Date(),
                     };
-                  },
+                  }
                 ),
               });
             } catch (error) {
-              console.error('Failed to save chat');
+              console.error("Failed to save chat");
             }
           }
         },
         experimental_telemetry: {
           isEnabled: true,
-          functionId: 'stream-text',
+          functionId: "stream-text",
         },
       });
 
@@ -1050,38 +1068,38 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
-  const id = searchParams.get('id');
+  const id = searchParams.get("id");
 
   if (!id) {
-    return new Response('Not Found', { status: 404 });
+    return new Response("Not Found", { status: 404 });
   }
 
   let session = await auth();
 
   // If no session exists, create an anonymous session
   if (!session?.user) {
-    await signIn('credentials', {
+    await signIn("credentials", {
       redirect: false,
     });
     session = await auth();
   }
 
   if (!session?.user?.id) {
-    return new Response('Failed to create session', { status: 500 });
+    return new Response("Failed to create session", { status: 500 });
   }
 
   try {
     const chat = await getChatById({ id });
 
     if (chat.userId !== session.user.id) {
-      return new Response('Unauthorized', { status: 401 });
+      return new Response("Unauthorized", { status: 401 });
     }
 
     await deleteChatById({ id });
 
-    return new Response('Chat deleted', { status: 200 });
+    return new Response("Chat deleted", { status: 200 });
   } catch (error) {
-    return new Response('An error occurred while processing your request', {
+    return new Response("An error occurred while processing your request", {
       status: 500,
     });
   }
