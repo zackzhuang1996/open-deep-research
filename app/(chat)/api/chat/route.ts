@@ -59,6 +59,8 @@ const app = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_API_KEY || '',
 });
 
+const reasoningModel = openai('o1-mini');
+
 export async function POST(request: Request) {
   const {
     id,
@@ -620,7 +622,7 @@ export async function POST(request: Request) {
             parameters: z.object({
               urls: z.array(z.string()).describe(
                 'Array of URLs to extract data from',
-                // , include a /* at the end of each URL if you think you need to search for other pages insdes that URL to extract the full data from',
+                // , include a /* at the end of each URL if you think you need to search for other pages insides that URL to extract the full data from',
               ),
               prompt: z
                 .string()
@@ -699,13 +701,15 @@ export async function POST(request: Request) {
               topic: z.string().describe('The topic or question to research'),
             }),
             execute: async ({ topic, maxDepth = 7 }) => {
+              const startTime = Date.now();
+              const timeLimit = 4.5 * 60 * 1000; // 4 minutes 30 seconds in milliseconds
+
               const researchState = {
-                findings: [] as Array<string>,
+                findings: [] as Array<{text: string, source: string}>,
                 currentDepth: 0,
                 failedAttempts: 0,
                 maxFailedAttempts: 3,
                 completedSteps: 0,
-                // Each depth has: 1 search + up to 3 extracts + 1 analysis = 5 steps per depth
                 totalExpectedSteps: maxDepth * 5
               };
 
@@ -751,10 +755,14 @@ export async function POST(request: Request) {
                 });
               };
 
-              const analyzeAndPlan = async (findings: string[]) => {
+              const analyzeAndPlan = async (findings: Array<{text: string, source: string}>) => {
                 try {
+                  const timeElapsed = Date.now() - startTime;
+                  const timeRemaining = timeLimit - timeElapsed;
+                  const timeRemainingMinutes = Math.round(timeRemaining / 1000 / 60 * 10) / 10;
+
                   const result = await generateObject({
-                    model: openai('o1'),
+                    model: reasoningModel,
                     schema: z.object({
                       analysis: z.object({
                         summary: z.string(),
@@ -764,8 +772,11 @@ export async function POST(request: Request) {
                       })
                     }),
                     prompt: `You are a research agent analyzing findings about: ${topic}
-                            Current findings: ${findings.join('\n')}
-                            What has been learned? What gaps remain? What specific aspects should be investigated next? Should I continue or do I need to stop as I have enough information?`
+                            You have ${timeRemainingMinutes} minutes remaining to complete the research but you don't need to use all of it.
+                            Current findings: ${findings.map(f => `[From ${f.source}]: ${f.text}`).join('\n')}
+                            What has been learned? What gaps remain? What specific aspects should be investigated next if any?
+                            Important: If less than 1 minute remains, set shouldContinue to false to allow time for final synthesis.
+                            If I have enough information, set shouldContinue to false.`
                   });
                   return result.object.analysis;
                 } catch (error) {
@@ -799,9 +810,12 @@ export async function POST(request: Request) {
                       });
 
                       if (Array.isArray(result.data)) {
-                        return result.data.map(item => item.data);
+                        return result.data.map(item => ({
+                          text: item.data,
+                          source: url
+                        }));
                       }
-                      return [result.data];
+                      return [{text: result.data, source: url}];
                     }
                     return [];
                   } catch (error) {
@@ -816,6 +830,11 @@ export async function POST(request: Request) {
 
               try {
                 while (researchState.currentDepth < maxDepth) {
+                  const timeElapsed = Date.now() - startTime;
+                  if (timeElapsed >= timeLimit) {
+                    break;
+                  }
+
                   researchState.currentDepth++;
                   
                   dataStream.writeData({
@@ -890,7 +909,7 @@ export async function POST(request: Request) {
                   });
 
                   const analysis = await analyzeAndPlan(researchState.findings);
-                  
+                  console.log(analysis);
                   if (!analysis) {
                     addActivity({
                       type: 'analyze',
@@ -932,10 +951,11 @@ export async function POST(request: Request) {
                 });
 
                 const finalAnalysis = await generateText({
-                  model: openai('o1-mini'),
+                  model: reasoningModel,
+                  maxTokens: 16000,
                   prompt: `Create a comprehensive analysis of ${topic} based on these findings:
-                          ${researchState.findings.join('\n')}
-                          Provide key insights, conclusions, and any remaining uncertainties.`
+                          ${researchState.findings.map(f => `[From ${f.source}]: ${f.text}`).join('\n')}
+                          Provide key insights, conclusions, and any remaining uncertainties. Include citations to sources where appropriate. This analysiss should be very comprehensive and full of details.`
                 });
 
                 addActivity({

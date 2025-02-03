@@ -119,7 +119,7 @@ function deepResearchReducer(state: DeepResearchState, action: DeepResearchActio
       };
     case 'CLEAR_STATE':
       return {
-        ...state,
+        ...initialState,
         activity: [],
         sources: [],
         currentDepth: 0,
