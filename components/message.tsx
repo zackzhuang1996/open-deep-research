@@ -388,7 +388,18 @@ const DeepResearchProgress = ({ state, activity }: {
 }) => {
   const { state: deepResearchState } = useDeepResearch();
   const [lastActivity, setLastActivity] = useState<string>('');
+  const [startTime] = useState<number>(Date.now());
+  const maxDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+  const [currentTime, setCurrentTime] = useState(Date.now());
   
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
   useEffect(() => {
     if (activity && activity.length > 0) {
       const lastItem = activity[activity.length - 1];
@@ -411,6 +422,12 @@ const DeepResearchProgress = ({ state, activity }: {
     );
   }, [deepResearchState.completedSteps, deepResearchState.totalExpectedSteps]);
 
+  // Calculate time progress
+  const timeProgress = useMemo(() => {
+    const elapsed = currentTime - startTime;
+    return Math.min((elapsed / maxDuration) * 100, 100);
+  }, [currentTime, startTime]);
+
   // Get current phase
   const currentPhase = useMemo(() => {
     if (!activity.length) return '';
@@ -424,14 +441,21 @@ const DeepResearchProgress = ({ state, activity }: {
     }
   }, [activity]);
 
+  // Format time
+  const formatTime = (ms: number) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const timeUntilTimeout = Math.max(maxDuration - (currentTime - startTime), 0);
+
   return (
     <div className="w-full space-y-2">
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div className="flex flex-col gap-1">
           <span>Research in progress...</span>
-          <span className="text-xs">
             {/* Depth: {deepResearchState.currentDepth}/{deepResearchState.maxDepth} */}
-          </span>
         </div>
         <div className="flex flex-col items-end gap-1">
           <span>{Math.round(progress)}%</span>
@@ -441,6 +465,11 @@ const DeepResearchProgress = ({ state, activity }: {
         </div>
       </div>
       <Progress value={progress} className="w-full" />
+      <div className="flex items-center justify-end text-xs text-muted-foreground mt-2">
+        <span>Time until timeout: {formatTime(timeUntilTimeout)}</span>
+        {/* <span>{Math.round(timeProgress)}% of max time used</span> */}
+      </div>
+      {/* <Progress value={timeProgress} className="w-full" /> */}
       <div className="text-xs text-muted-foreground">
         {lastActivity}
       </div>

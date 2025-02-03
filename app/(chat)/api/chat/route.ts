@@ -697,7 +697,6 @@ export async function POST(request: Request) {
             description: 'Perform deep research on a topic using an AI agent that coordinates search, extract, and analysis tools with reasoning steps.',
             parameters: z.object({
               topic: z.string().describe('The topic or question to research'),
-              maxDepth: z.number().optional().describe('Maximum depth of research iterations'),
             }),
             execute: async ({ topic, maxDepth = 7 }) => {
               const researchState = {
@@ -755,7 +754,7 @@ export async function POST(request: Request) {
               const analyzeAndPlan = async (findings: string[]) => {
                 try {
                   const result = await generateObject({
-                    model: openai('gpt-4o'),
+                    model: openai('o1'),
                     schema: z.object({
                       analysis: z.object({
                         summary: z.string(),
@@ -776,12 +775,10 @@ export async function POST(request: Request) {
               };
 
               const extractFromUrls = async (urls: string[]) => {
-                const results: string[] = [];
-                
-                for (const url of urls) {
+                const extractPromises = urls.map(async (url) => {
                   try {
                     addActivity({
-                      type: 'extract',
+                      type: 'extract', 
                       status: 'pending',
                       message: `Analyzing ${new URL(url).hostname}`,
                       timestamp: new Date().toISOString(),
@@ -795,31 +792,26 @@ export async function POST(request: Request) {
                     if (result.success) {
                       addActivity({
                         type: 'extract',
-                        status: 'complete',
+                        status: 'complete', 
                         message: `Extracted from ${new URL(url).hostname}`,
                         timestamp: new Date().toISOString(),
                         depth: researchState.currentDepth
                       });
-                      
+
                       if (Array.isArray(result.data)) {
-                        results.push(...result.data.map(item => item.data));
-                      } else {
-                        results.push(result.data);
+                        return result.data.map(item => item.data);
                       }
+                      return [result.data];
                     }
+                    return [];
                   } catch (error) {
-                    console.error(`Extraction failed for ${url}:`, error);
-                    addActivity({
-                      type: 'extract',
-                      status: 'error',
-                      message: `Failed to extract from ${url}`,
-                      timestamp: new Date().toISOString(),
-                      depth: researchState.currentDepth
-                    });
+                    console.warn(`Extraction failed for ${url}:`);
+                    return [];
                   }
-                }
-                
-                return results;
+                });
+
+                const results = await Promise.all(extractPromises);
+                return results.flat();
               };
 
               try {
@@ -940,7 +932,7 @@ export async function POST(request: Request) {
                 });
 
                 const finalAnalysis = await generateText({
-                  model: openai('gpt-4o'),
+                  model: openai('o1-mini'),
                   prompt: `Create a comprehensive analysis of ${topic} based on these findings:
                           ${researchState.findings.join('\n')}
                           Provide key insights, conclusions, and any remaining uncertainties.`

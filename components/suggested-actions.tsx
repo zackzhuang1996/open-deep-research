@@ -17,29 +17,17 @@ interface SuggestedActionsProps {
 function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
   const suggestedActions = [
     {
-      title: 'Extract company info',
-      label: 'from any website',
+      title: 'Research a topic',
+      label: 'deep dive with AI',
       action:
-        'Extract the company mission, values and key features from this website: ',
+        'Perform deep research on this topic and provide a comprehensive analysis: ',
     },
     {
-      title: 'Find pricing details',
-      label: 'on any product page',
+      title: 'Compare and analyze',
+      label: 'multiple perspectives',
       action:
-        'Extract all pricing information and plan features from this page: ',
-    },
-    {
-      title: 'Get contact details',
-      label: 'from business websites',
-      action:
-        'Extract all contact information including email, phone and address from: ',
-    },
-    {
-      title: 'Summarize job listings',
-      label: 'from career pages',
-      action:
-        'Extract the key requirements, responsibilities and benefits from this job posting: ',
-    },
+        'Research and analyze different viewpoints and evidence about: ',
+    }
   ];
 
   return (

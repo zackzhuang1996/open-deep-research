@@ -30,24 +30,23 @@ export function DeepResearch({
 
   return (
     <div className="fixed right-4 top-20 w-80 bg-background border rounded-lg shadow-lg p-4 max-h-[80vh] flex flex-col overflow-hidden">
-      
       <Tabs defaultValue="activity" className="flex flex-col h-full">
         <TabsList className="w-full">
           <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
           <TabsTrigger value="sources" className="flex-1">Sources</TabsTrigger>
         </TabsList>
         
-        <TabsContent value="activity" className="flex-1 overflow-y-auto">
-          <div className="space-y-4 pr-2">
+        <TabsContent value="activity" className="flex-1 overflow-y-auto mt-2">
+          <div className="space-y-4 pr-2 h-full">
             {[...activity].reverse().map((item, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-start gap-3"
+                className="flex items-center gap-3"
               >
                 <div className={cn(
-                  "mt-1 size-2 rounded-full shrink-0",
+                  "size-2 rounded-full shrink-0",
                   item.status === 'pending' && "bg-yellow-500",
                   item.status === 'complete' && "bg-green-500",
                   item.status === 'error' && "bg-red-500"
@@ -63,7 +62,7 @@ export function DeepResearch({
           </div>
         </TabsContent>
         
-        <TabsContent value="sources" className="flex-1 overflow-y-auto">
+        <TabsContent value="sources" className="flex-1 overflow-y-auto mt-2">
           <div className="space-y-4 pr-2">
             {sources.map((source, index) => (
               <motion.div
