@@ -38,23 +38,16 @@ import FirecrawlApp from '@mendable/firecrawl-js';
 export const maxDuration = 300;
 
 type AllowedTools =
-  | 'createDocument'
-  | 'updateDocument'
   | 'requestSuggestions'
-  | 'search'
-  | 'extract'
-  | 'scrape'
   | 'deepResearch';
 
 const blocksTools: AllowedTools[] = [
-  'createDocument',
-  'updateDocument',
   'requestSuggestions',
 ];
 
-const firecrawlTools: AllowedTools[] = ['search', 'extract', 'scrape'];
+// const firecrawlTools: AllowedTools[] = ['search', 'extract', 'scrape'];
 
-const allTools: AllowedTools[] = [...firecrawlTools, 'deepResearch'];
+const allTools: AllowedTools[] = [ 'deepResearch'];
 
 const app = new FirecrawlApp({
   apiKey: process.env.FIRECRAWL_API_KEY || '',
@@ -735,6 +728,8 @@ export async function POST(request: Request) {
                   });
                 }
               };
+
+              
 
               try {
                 // Initial search activity

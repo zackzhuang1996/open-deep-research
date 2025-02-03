@@ -23,7 +23,7 @@ import { useLocalStorage, useWindowSize } from 'usehooks-ts';
 
 import { sanitizeUIMessages } from '@/lib/utils';
 
-import { ArrowUpIcon, PaperclipIcon, StopIcon } from './icons';
+import { ArrowUpIcon, PaperclipIcon, StopIcon, GlobeIcon } from './icons';
 import { PreviewAttachment } from './preview-attachment';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
@@ -31,6 +31,7 @@ import { SuggestedActions } from './suggested-actions';
 import equal from 'fast-deep-equal';
 import { useDeepResearch } from '@/lib/deep-research-context';
 import { DeepResearch } from './deep-research';
+import { Telescope } from 'lucide-react';
 
 function PureMultimodalInput({
   chatId,
@@ -69,7 +70,7 @@ function PureMultimodalInput({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { width } = useWindowSize();
-  const { state: deepResearchState, toggleActive: toggleDeepResearch } = useDeepResearch();
+  const { state: deepResearchState } = useDeepResearch();
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -125,7 +126,7 @@ function PureMultimodalInput({
 
     handleSubmit(undefined, {
       experimental_attachments: attachments,
-      experimental_deepResearch: deepResearchState.isActive,
+      experimental_deepResearch: true,
     });
 
     setAttachments([]);
@@ -142,7 +143,6 @@ function PureMultimodalInput({
     setLocalStorageInput,
     width,
     chatId,
-    deepResearchState.isActive,
   ]);
 
   const uploadFile = async (file: File) => {
@@ -236,13 +236,15 @@ function PureMultimodalInput({
       )}
 
       <div className="flex flex-col gap-2">
-        <DeepResearch
-          isActive={deepResearchState.isActive}
-          onToggle={toggleDeepResearch}
-          isLoading={isLoading}
-          activity={deepResearchState.activity}
-          sources={deepResearchState.sources}
-        />
+        {isLoading && (
+          <DeepResearch
+            isActive={true}
+            onToggle={() => {}}
+            isLoading={isLoading}
+            activity={deepResearchState.activity}
+            sources={deepResearchState.sources}
+          />
+        )}
 
         <Textarea
           ref={textareaRef}
@@ -269,8 +271,9 @@ function PureMultimodalInput({
         />
       </div>
 
-      <div className="absolute bottom-0 p-2 w-fit flex flex-row justify-start">
+      <div className="absolute bottom-0 p-2 flex flex-row gap-2 justify-start items-center">
         <AttachmentsButton fileInputRef={fileInputRef} isLoading={isLoading} />
+        <DeepResearchButton />
       </div>
 
       <div className="absolute bottom-0 right-0 p-2 w-fit flex flex-row justify-end">
@@ -375,3 +378,18 @@ const SendButton = memo(PureSendButton, (prevProps, nextProps) => {
   if (prevProps.input !== nextProps.input) return false;
   return true;
 });
+
+function PureDeepResearchButton() {
+  return (
+    <Button
+      className="rounded-full px-3 py-1.5 h-fit flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border-0 disabled:opacity-100 disabled:cursor-not-allowed"
+      variant="ghost"
+      disabled
+    >
+      <Telescope size={14} />
+      Using Deep Research
+    </Button>
+  );
+}
+
+const DeepResearchButton = memo(PureDeepResearchButton);
