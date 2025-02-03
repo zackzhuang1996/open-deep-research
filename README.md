@@ -1,7 +1,7 @@
 
-# Extract.chat
+# Open Deep Research
 
-An Open-Source AI Chatbot w/ Firecrawl Integrated - Fork of Vercel's AI Chatbot 
+An Open-Source clone of Open AI's Deep Research experiment. Instead of using a fine=tuned version of o3, this method uses ]Firecrawl's extract + search](https://firecrawl.dev/) with a reasoning model to deep research the web.
 
 ## Features
 
