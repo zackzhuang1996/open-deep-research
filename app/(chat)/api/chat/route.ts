@@ -628,12 +628,9 @@ export async function POST(request: Request) {
             }),
             execute: async ({ urls, prompt }) => {
               try {
-                console.log(urls);
                 const scrapeResult = await app.extract(urls, {
                   prompt,
                 });
-
-                console.log(scrapeResult);
 
                 if (!scrapeResult.success) {
                   return {
@@ -666,8 +663,6 @@ export async function POST(request: Request) {
             execute: async ({ url }: { url: string }) => {
               try {
                 const scrapeResult = await app.scrapeUrl(url);
-
-                console.log(scrapeResult);
 
                 if (!scrapeResult.success) {
                   return {
@@ -705,6 +700,9 @@ export async function POST(request: Request) {
 
               const researchState = {
                 findings: [] as Array<{ text: string; source: string }>,
+                summaries: [] as Array<string>,
+                nextSearchTopic: '',
+                urlToSearch: '',
                 currentDepth: 0,
                 failedAttempts: 0,
                 maxFailedAttempts: 3,
@@ -770,13 +768,15 @@ export async function POST(request: Request) {
                     Math.round((timeRemaining / 1000 / 60) * 10) / 10;
 
                   const result = await generateObject({
-                    model: reasoningModel,
+                    model: openai('gpt-4o'), // feel free to change to a reasoning model, if so change the output to not be json (not supported)
                     schema: z.object({
                       analysis: z.object({
                         summary: z.string(),
                         gaps: z.array(z.string()),
                         nextSteps: z.array(z.string()),
                         shouldContinue: z.boolean(),
+                        nextSearchTopic: z.string().optional(),
+                        urlToSearch: z.string().optional(),
                       }),
                     }),
                     prompt: `You are a research agent analyzing findings about: ${topic}
@@ -785,6 +785,8 @@ export async function POST(request: Request) {
                               .map((f) => `[From ${f.source}]: ${f.text}`)
                               .join('\n')}
                             What has been learned? What gaps remain? What specific aspects should be investigated next if any?
+                            If you need to search for more information, set nextSearchTopic.
+                            If you need to search for more information in a specific URL, set urlToSearch.
                             Important: If less than 1 minute remains, set shouldContinue to false to allow time for final synthesis.
                             If I have enough information, set shouldContinue to false.`,
                   });
@@ -866,13 +868,14 @@ export async function POST(request: Request) {
                     depth: researchState.currentDepth,
                   });
 
-                  const searchResult = await app.search(topic);
+                  let searchTopic = researchState.nextSearchTopic || topic;
+                  const searchResult = await app.search(searchTopic);
 
                   if (!searchResult.success) {
                     addActivity({
                       type: 'search',
                       status: 'error',
-                      message: `Search failed for "${topic}"`,
+                      message: `Search failed for "${searchTopic}"`,
                       timestamp: new Date().toISOString(),
                       depth: researchState.currentDepth,
                     });
@@ -909,7 +912,10 @@ export async function POST(request: Request) {
                     .slice(0, 3)
                     .map((result: any) => result.url);
 
-                  const newFindings = await extractFromUrls(topUrls);
+                  const newFindings = await extractFromUrls([
+                    researchState.urlToSearch,
+                    ...topUrls,
+                  ]);
                   researchState.findings.push(...newFindings);
 
                   // Analysis phase
@@ -922,6 +928,11 @@ export async function POST(request: Request) {
                   });
 
                   const analysis = await analyzeAndPlan(researchState.findings);
+                  researchState.nextSearchTopic =
+                    analysis?.nextSearchTopic || '';
+                  researchState.urlToSearch = analysis?.urlToSearch || '';
+                  researchState.summaries.push(analysis?.summary || '');
+
                   console.log(analysis);
                   if (!analysis) {
                     addActivity({
@@ -954,7 +965,7 @@ export async function POST(request: Request) {
                     break;
                   }
 
-                  topic = analysis.gaps[0];
+                  topic = analysis.gaps.shift() || topic;
                 }
 
                 // Final synthesis
@@ -969,11 +980,14 @@ export async function POST(request: Request) {
                 const finalAnalysis = await generateText({
                   model: reasoningModel,
                   maxTokens: 16000,
-                  prompt: `Create a comprehensive analysis of ${topic} based on these findings:
+                  prompt: `Create a comprehensive long analysis of ${topic} based on these findings:
                           ${researchState.findings
                             .map((f) => `[From ${f.source}]: ${f.text}`)
                             .join('\n')}
-                          Provide key insights, conclusions, and any remaining uncertainties. Include citations to sources where appropriate. This analysiss should be very comprehensive and full of details.`,
+                          ${researchState.summaries
+                            .map((s) => `[Summary]: ${s}`)
+                            .join('\n')}
+                          Provide key insights, conclusions, and any remaining uncertainties. Include citations to sources where appropriate. This analysis should be very comprehensive and full of details. It is expected to be long.`,
                 });
 
                 addActivity({
