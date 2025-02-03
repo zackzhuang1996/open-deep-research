@@ -718,24 +718,26 @@ export async function POST(request: Request) {
 
               const addActivity = (activity: typeof researchState.activity[0]) => {
                 researchState.activity.push(activity);
+                // Stream each activity update immediately
                 dataStream.writeData({
-                  type: 'research-activity',
-                  content: activity,
+                  type: 'activity-delta',
+                  content: activity
                 });
               };
 
               const addSource = (source: typeof researchState.sources[0]) => {
                 if (!researchState.sources.find(s => s.url === source.url)) {
                   researchState.sources.push(source);
+                  // Stream each source update immediately
                   dataStream.writeData({
-                    type: 'research-source',
-                    content: source,
+                    type: 'source-delta',
+                    content: source
                   });
                 }
               };
 
               try {
-                // Initial search
+                // Initial search activity
                 addActivity({
                   type: 'search',
                   status: 'pending',
@@ -749,6 +751,7 @@ export async function POST(request: Request) {
                   throw new Error(`Search failed: ${searchResult.error}`);
                 }
 
+                // Stream search completion activity
                 addActivity({
                   type: 'search',
                   status: 'complete',
@@ -756,7 +759,7 @@ export async function POST(request: Request) {
                   timestamp: new Date().toISOString(),
                 });
 
-                // Add sources from search
+                // Stream sources from search
                 searchResult.data.forEach((result: any) => {
                   addSource({
                     url: result.url,
@@ -765,7 +768,7 @@ export async function POST(request: Request) {
                   });
                 });
 
-                // Extract information from top sources one by one to avoid overloading
+                // Extract information from top sources
                 const topUrls = searchResult.data
                   .slice(0, 3)
                   .map((result: any) => result.url);
@@ -773,6 +776,7 @@ export async function POST(request: Request) {
                 const findings: string[] = [];
 
                 for (const url of topUrls) {
+                  // Stream extraction start activity
                   addActivity({
                     type: 'extract',
                     status: 'pending',
@@ -786,6 +790,7 @@ export async function POST(request: Request) {
                     });
 
                     if (extractResult.success) {
+                      // Stream extraction success activity
                       addActivity({
                         type: 'extract',
                         status: 'complete',
@@ -798,7 +803,14 @@ export async function POST(request: Request) {
                       } else {
                         findings.push(extractResult.data);
                       }
+
+                      // Stream each finding immediately
+                      dataStream.writeData({
+                        type: 'text-delta',
+                        content: extractResult.data + '\n'
+                      });
                     } else {
+                      // Stream extraction error activity
                       addActivity({
                         type: 'extract',
                         status: 'error',
@@ -808,6 +820,7 @@ export async function POST(request: Request) {
                     }
                   } catch (error: any) {
                     console.error('Extraction error for URL:', url, error);
+                    // Stream extraction error activity
                     addActivity({
                       type: 'extract',
                       status: 'error',
@@ -822,6 +835,7 @@ export async function POST(request: Request) {
 
                 // Only proceed with analysis if we have findings
                 if (findings.length > 0) {
+                  // Stream analysis start activity
                   addActivity({
                     type: 'analyze',
                     status: 'pending',
@@ -831,11 +845,18 @@ export async function POST(request: Request) {
 
                   researchState.findings = findings;
 
+                  // Stream analysis completion activity
                   addActivity({
                     type: 'analyze',
                     status: 'complete',
                     message: `Analysis complete - Found information from ${findings.length} sources`,
                     timestamp: new Date().toISOString(),
+                  });
+
+                  // Stream final summary
+                  dataStream.writeData({
+                    type: 'finish',
+                    content: ''
                   });
 
                   return {
@@ -852,11 +873,18 @@ export async function POST(request: Request) {
 
               } catch (error: any) {
                 console.error('Deep research error:', error);
+                // Stream error activity
                 addActivity({
                   type: 'analyze',
                   status: 'error',
                   message: `Research failed: ${error.message}`,
                   timestamp: new Date().toISOString(),
+                });
+
+                // Stream error state
+                dataStream.writeData({
+                  type: 'finish',
+                  content: ''
                 });
 
                 return {

@@ -7,6 +7,7 @@ import { Suggestion } from '@/lib/db/schema';
 import { initialBlockData, useBlock } from '@/hooks/use-block';
 import { useUserMessageId } from '@/hooks/use-user-message-id';
 import { cx } from 'class-variance-authority';
+import { useDeepResearch } from '@/lib/deep-research-context';
 
 type DataStreamDelta = {
   type:
@@ -19,14 +20,26 @@ type DataStreamDelta = {
     | 'clear'
     | 'finish'
     | 'user-message-id'
-    | 'kind';
-  content: string | Suggestion;
+    | 'kind'
+    | 'activity-delta'
+    | 'source-delta';
+  content: string | Suggestion | {
+    type: 'search' | 'extract' | 'analyze';
+    status: 'pending' | 'complete' | 'error';
+    message: string;
+    timestamp: string;
+  } | {
+    url: string;
+    title: string;
+    relevance: number;
+  };
 };
 
 export function DataStreamHandler({ id }: { id: string }) {
   const { data: dataStream } = useChat({ id });
   const { setUserMessageIdFromServer } = useUserMessageId();
   const { setBlock } = useBlock();
+  const { addActivity, addSource } = useDeepResearch();
   const lastProcessedIndex = useRef(-1);
 
   useEffect(() => {
@@ -114,12 +127,37 @@ export function DataStreamHandler({ id }: { id: string }) {
               status: 'idle',
             };
 
+          case 'activity-delta':
+            const activity = delta.content as {
+              type: 'search' | 'extract' | 'analyze';
+              status: 'pending' | 'complete' | 'error';
+              message: string;
+              timestamp: string;
+            };
+            addActivity(activity);
+            return {
+              ...draftBlock,
+              status: 'streaming',
+            };
+
+          case 'source-delta':
+            const source = delta.content as {
+              url: string;
+              title: string;
+              relevance: number;
+            };
+            addSource(source);
+            return {
+              ...draftBlock,
+              status: 'streaming',
+            };
+
           default:
             return draftBlock;
         }
       });
     });
-  }, [dataStream, setBlock, setUserMessageIdFromServer]);
+  }, [dataStream, setBlock, setUserMessageIdFromServer, addActivity, addSource]);
 
   return null;
 }
