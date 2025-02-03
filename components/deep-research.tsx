@@ -7,7 +7,13 @@ interface DeepResearchProps {
   onToggle: () => void;
   isLoading?: boolean;
   activity?: Array<{
-    type: 'search' | 'extract' | 'analyze' | 'reasoning' | 'synthesis' | 'thought';
+    type:
+      | 'search'
+      | 'extract'
+      | 'analyze'
+      | 'reasoning'
+      | 'synthesis'
+      | 'thought';
     status: 'pending' | 'complete' | 'error';
     message: string;
     timestamp: string;
@@ -24,7 +30,7 @@ export function DeepResearch({
   activity = [],
   sources = [],
 }: DeepResearchProps) {
-  if ((activity.length === 0 && sources.length === 0)) {
+  if (activity.length === 0 && sources.length === 0) {
     return null;
   }
 
@@ -32,10 +38,14 @@ export function DeepResearch({
     <div className="fixed right-4 top-20 w-80 bg-background border rounded-lg shadow-lg p-4 max-h-[80vh] flex flex-col overflow-hidden">
       <Tabs defaultValue="activity" className="flex flex-col h-full">
         <TabsList className="w-full">
-          <TabsTrigger value="activity" className="flex-1">Activity</TabsTrigger>
-          <TabsTrigger value="sources" className="flex-1">Sources</TabsTrigger>
+          <TabsTrigger value="activity" className="flex-1">
+            Activity
+          </TabsTrigger>
+          <TabsTrigger value="sources" className="flex-1">
+            Sources
+          </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="activity" className="flex-1 overflow-y-auto mt-2">
           <div className="space-y-4 pr-2 h-full">
             {[...activity].reverse().map((item, index) => (
@@ -45,14 +55,18 @@ export function DeepResearch({
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-center gap-3"
               >
-                <div className={cn(
-                  "size-2 rounded-full shrink-0",
-                  item.status === 'pending' && "bg-yellow-500",
-                  item.status === 'complete' && "bg-green-500",
-                  item.status === 'error' && "bg-red-500"
-                )} />
+                <div
+                  className={cn(
+                    'size-2 rounded-full shrink-0',
+                    item.status === 'pending' && 'bg-yellow-500',
+                    item.status === 'complete' && 'bg-green-500',
+                    item.status === 'error' && 'bg-red-500',
+                  )}
+                />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-foreground break-words whitespace-pre-wrap">{item.message}</p>
+                  <p className="text-sm text-foreground break-words whitespace-pre-wrap">
+                    {item.message}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(item.timestamp).toLocaleTimeString()}
                   </p>
@@ -61,7 +75,7 @@ export function DeepResearch({
             ))}
           </div>
         </TabsContent>
-        
+
         <TabsContent value="sources" className="flex-1 overflow-y-auto mt-2">
           <div className="space-y-4 pr-2">
             {sources.map((source, index) => (

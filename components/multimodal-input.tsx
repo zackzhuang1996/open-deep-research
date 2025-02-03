@@ -1,10 +1,6 @@
 'use client';
 
-import type {
-  Attachment,
-  CreateMessage,
-  Message,
-} from 'ai';
+import type { Attachment, CreateMessage, Message } from 'ai';
 import type { ChatRequestOptions } from '@/lib/types';
 import cx from 'classnames';
 import type React from 'react';
@@ -236,13 +232,13 @@ function PureMultimodalInput({
       )}
 
       <div className="flex flex-col gap-2">
-          <DeepResearch
-            isActive={true}
-            onToggle={() => {}}
-            isLoading={isLoading}
-            activity={deepResearchState.activity}
-            sources={deepResearchState.sources}
-          />
+        <DeepResearch
+          isActive={true}
+          onToggle={() => {}}
+          isLoading={isLoading}
+          activity={deepResearchState.activity}
+          sources={deepResearchState.sources}
+        />
 
         <Textarea
           ref={textareaRef}
@@ -260,7 +256,9 @@ function PureMultimodalInput({
               event.preventDefault();
 
               if (isLoading) {
-                toast.error('Please wait for the model to finish its response!');
+                toast.error(
+                  'Please wait for the model to finish its response!',
+                );
               } else {
                 submitForm();
               }

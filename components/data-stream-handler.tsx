@@ -23,16 +23,26 @@ type DataStreamDelta = {
     | 'kind'
     | 'activity-delta'
     | 'source-delta';
-  content: string | Suggestion | {
-    type: 'search' | 'extract' | 'analyze' | 'reasoning' | 'synthesis' | 'thought';
-    status: 'pending' | 'complete' | 'error';
-    message: string;
-    timestamp: string;
-  } | {
-    url: string;
-    title: string;
-    relevance: number;
-  };
+  content:
+    | string
+    | Suggestion
+    | {
+        type:
+          | 'search'
+          | 'extract'
+          | 'analyze'
+          | 'reasoning'
+          | 'synthesis'
+          | 'thought';
+        status: 'pending' | 'complete' | 'error';
+        message: string;
+        timestamp: string;
+      }
+    | {
+        url: string;
+        title: string;
+        relevance: number;
+      };
 };
 
 export function DataStreamHandler({ id }: { id: string }) {
@@ -157,7 +167,13 @@ export function DataStreamHandler({ id }: { id: string }) {
         }
       });
     });
-  }, [dataStream, setBlock, setUserMessageIdFromServer, addActivity, addSource]);
+  }, [
+    dataStream,
+    setBlock,
+    setUserMessageIdFromServer,
+    addActivity,
+    addSource,
+  ]);
 
   return null;
 }

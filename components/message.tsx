@@ -47,7 +47,8 @@ const PurePreviewMessage = ({
   isReadonly: boolean;
 }) => {
   const [mode, setMode] = useState<'view' | 'edit'>('view');
-  const { addActivity, addSource, initProgress, setDepth, updateProgress } = useDeepResearch();
+  const { addActivity, addSource, initProgress, setDepth, updateProgress } =
+    useDeepResearch();
 
   useEffect(() => {
     if (message.toolInvocations) {
@@ -55,34 +56,52 @@ const PurePreviewMessage = ({
         try {
           if (toolInvocation.toolName === 'deepResearch') {
             // Handle progress initialization
-            if ('delta' in toolInvocation && toolInvocation.delta?.type === 'progress-init') {
+            if (
+              'delta' in toolInvocation &&
+              toolInvocation.delta?.type === 'progress-init'
+            ) {
               const { maxDepth, totalSteps } = toolInvocation.delta.content;
               initProgress(maxDepth, totalSteps);
             }
-            
+
             // Handle depth updates
-            if ('delta' in toolInvocation && toolInvocation.delta?.type === 'depth-delta') {
+            if (
+              'delta' in toolInvocation &&
+              toolInvocation.delta?.type === 'depth-delta'
+            ) {
               const { current, max } = toolInvocation.delta.content;
               setDepth(current, max);
             }
 
             // Handle activity updates
-            if ('delta' in toolInvocation && toolInvocation.delta?.type === 'activity-delta') {
+            if (
+              'delta' in toolInvocation &&
+              toolInvocation.delta?.type === 'activity-delta'
+            ) {
               const activity = toolInvocation.delta.content;
               addActivity(activity);
-              
-              if (activity.completedSteps !== undefined && activity.totalSteps !== undefined) {
+
+              if (
+                activity.completedSteps !== undefined &&
+                activity.totalSteps !== undefined
+              ) {
                 updateProgress(activity.completedSteps, activity.totalSteps);
               }
             }
 
             // Handle source updates
-            if ('delta' in toolInvocation && toolInvocation.delta?.type === 'source-delta') {
+            if (
+              'delta' in toolInvocation &&
+              toolInvocation.delta?.type === 'source-delta'
+            ) {
               addSource(toolInvocation.delta.content);
             }
 
             // Handle final result
-            if (toolInvocation.state === 'result' && toolInvocation.result?.success) {
+            if (
+              toolInvocation.state === 'result' &&
+              toolInvocation.result?.success
+            ) {
               const { completedSteps, totalSteps } = toolInvocation.result.data;
               if (completedSteps !== undefined && totalSteps !== undefined) {
                 updateProgress(completedSteps, totalSteps);
@@ -94,7 +113,14 @@ const PurePreviewMessage = ({
         }
       });
     }
-  }, [message.toolInvocations, addActivity, addSource, initProgress, setDepth, updateProgress]);
+  }, [
+    message.toolInvocations,
+    addActivity,
+    addSource,
+    initProgress,
+    setDepth,
+    updateProgress,
+  ]);
 
   return (
     <AnimatePresence>
@@ -240,7 +266,9 @@ const PurePreviewMessage = ({
                           />
                         ) : toolName === 'deepResearch' ? (
                           <div className="text-sm text-muted-foreground">
-                            {result.success ? 'Research completed successfully.' : `Research may have failed: ${result.error}`}
+                            {result.success
+                              ? 'Research completed successfully.'
+                              : `Research may have failed: ${result.error}`}
                           </div>
                         ) : (
                           <pre>{JSON.stringify(result, null, 2)}</pre>
@@ -280,26 +308,32 @@ const PurePreviewMessage = ({
                           isLoading={true}
                         />
                       ) : toolName === 'deepResearch' ? (
-                        <DeepResearchProgress 
+                        <DeepResearchProgress
                           state={state}
                           activity={
-                            (toolInvocation as { 
-                              state: string; 
-                              delta?: { 
-                                activity?: Array<{
-                                  type: string;
-                                  status: string;
-                                  message: string;
-                                  timestamp: string;
-                                  depth?: number;
-                                  completedSteps?: number;
-                                  totalSteps?: number;
-                                }> 
-                              } 
-                            }).state === 'streaming' && 
-                            (toolInvocation as any).delta?.activity ? 
-                            [...((toolInvocation as any).delta.activity || [])] : []
-                          } 
+                            (
+                              toolInvocation as {
+                                state: string;
+                                delta?: {
+                                  activity?: Array<{
+                                    type: string;
+                                    status: string;
+                                    message: string;
+                                    timestamp: string;
+                                    depth?: number;
+                                    completedSteps?: number;
+                                    totalSteps?: number;
+                                  }>;
+                                };
+                              }
+                            ).state === 'streaming' &&
+                            (toolInvocation as any).delta?.activity
+                              ? [
+                                  ...((toolInvocation as any).delta.activity ||
+                                    []),
+                                ]
+                              : []
+                          }
                         />
                       ) : null}
                     </div>
@@ -374,8 +408,11 @@ export const ThinkingMessage = () => {
   );
 };
 
-const DeepResearchProgress = ({ state, activity }: { 
-  state: string; 
+const DeepResearchProgress = ({
+  state,
+  activity,
+}: {
+  state: string;
   activity: Array<{
     type: string;
     status: string;
@@ -384,14 +421,14 @@ const DeepResearchProgress = ({ state, activity }: {
     depth?: number;
     completedSteps?: number;
     totalSteps?: number;
-  }> 
+  }>;
 }) => {
   const { state: deepResearchState } = useDeepResearch();
   const [lastActivity, setLastActivity] = useState<string>('');
   const [startTime] = useState<number>(Date.now());
   const maxDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
   const [currentTime, setCurrentTime] = useState(Date.now());
-  
+
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(Date.now());
@@ -406,7 +443,10 @@ const DeepResearchProgress = ({ state, activity }: {
       setLastActivity(lastItem.message);
 
       // Update progress from activity if available
-      if (lastItem.completedSteps !== undefined && lastItem.totalSteps !== undefined) {
+      if (
+        lastItem.completedSteps !== undefined &&
+        lastItem.totalSteps !== undefined
+      ) {
         deepResearchState.completedSteps = lastItem.completedSteps;
         deepResearchState.totalExpectedSteps = lastItem.totalSteps;
       }
@@ -417,8 +457,10 @@ const DeepResearchProgress = ({ state, activity }: {
   const progress = useMemo(() => {
     if (deepResearchState.totalExpectedSteps === 0) return 0;
     return Math.min(
-      (deepResearchState.completedSteps / deepResearchState.totalExpectedSteps) * 100,
-      100
+      (deepResearchState.completedSteps /
+        deepResearchState.totalExpectedSteps) *
+        100,
+      100,
     );
   }, [deepResearchState.completedSteps, deepResearchState.totalExpectedSteps]);
 
@@ -433,11 +475,16 @@ const DeepResearchProgress = ({ state, activity }: {
     if (!activity.length) return '';
     const current = activity[activity.length - 1];
     switch (current.type) {
-      case 'search': return 'Searching';
-      case 'extract': return 'Extracting';
-      case 'analyze': return 'Analyzing';
-      case 'synthesis': return 'Synthesizing';
-      default: return 'Researching';
+      case 'search':
+        return 'Searching';
+      case 'extract':
+        return 'Extracting';
+      case 'analyze':
+        return 'Analyzing';
+      case 'synthesis':
+        return 'Synthesizing';
+      default:
+        return 'Researching';
     }
   }, [activity]);
 
@@ -455,7 +502,7 @@ const DeepResearchProgress = ({ state, activity }: {
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div className="flex flex-col gap-1">
           <span>Research in progress...</span>
-            {/* Depth: {deepResearchState.currentDepth}/{deepResearchState.maxDepth} */}
+          {/* Depth: {deepResearchState.currentDepth}/{deepResearchState.maxDepth} */}
         </div>
         <div className="flex flex-col items-end gap-1">
           <span>{Math.round(progress)}%</span>
@@ -470,9 +517,7 @@ const DeepResearchProgress = ({ state, activity }: {
         {/* <span>{Math.round(timeProgress)}% of max time used</span> */}
       </div>
       {/* <Progress value={timeProgress} className="w-full" /> */}
-      <div className="text-xs text-muted-foreground">
-        {lastActivity}
-      </div>
+      <div className="text-xs text-muted-foreground">{lastActivity}</div>
     </div>
   );
 };

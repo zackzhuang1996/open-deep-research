@@ -25,9 +25,8 @@ function PureSuggestedActions({ chatId, append }: SuggestedActionsProps) {
     {
       title: 'Compare and analyze',
       label: 'multiple perspectives',
-      action:
-        'Research and analyze different viewpoints and evidence about: ',
-    }
+      action: 'Research and analyze different viewpoints and evidence about: ',
+    },
   ];
 
   return (
