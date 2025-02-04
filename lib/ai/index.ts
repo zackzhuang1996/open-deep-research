@@ -6,7 +6,8 @@ import { customMiddleware } from "./custom-middleware";
 
 export const customModel = (apiIdentifier: string) => {
   // Check which API key is available
-  const hasOpenRouterKey = process.env.OPENROUTER_API_KEY !== "****";
+  const hasOpenRouterKey =
+    process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY !== "****";
 
   // Select the appropriate provider
   const provider = hasOpenRouterKey
