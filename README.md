@@ -48,8 +48,18 @@ You will need to use the environment variables [defined in `.env.example`](.env.
 2. Link local instance with Vercel and GitHub accounts (creates `.vercel` directory): `vercel link`
 3. Download your environment variables: `vercel env pull`
 
+# 1. First install all dependencies
 ```bash
 pnpm install
+```
+
+# 2. Then run database migrations
+```bash
+pnpm db:migrate
+```
+
+# 3. Run the app
+```bash
 pnpm dev
 ```
 
