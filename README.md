@@ -5,7 +5,7 @@ An Open-Source clone of Open AI's Deep Research experiment. Instead of using a f
 
 Check out the demo [here](https://x.com/nickscamara_/status/1886459999905521912)
 
-![Open Deep Research Hero](public/images/open-deep-research.png)
+![Open Deep Research Hero](public/open-deep-researched-pic.png)
 
 ## Features
 
